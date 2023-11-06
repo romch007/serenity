@@ -1,6 +1,7 @@
 add_subdirectory(LibAccelGfx)
 add_subdirectory(LibArchive)
 add_subdirectory(LibAudio)
+add_subdirectory(LibBitTorrent)
 add_subdirectory(LibC)
 add_subdirectory(LibCards)
 add_subdirectory(LibChess)
