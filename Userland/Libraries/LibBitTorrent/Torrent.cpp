@@ -9,17 +9,9 @@
 #include <AK/JsonObject.h>
 #include <LibCrypto/Hash/SHA1.h>
 
-#define REQUIRE(expr)                                                  \
-    ({                                                                 \
-        auto&& maybe_value = expr;                                     \
-        if (!maybe_value.has_value())                                  \
-            return Error::from_string_literal("Torrent: missing key"); \
-        maybe_value.release_value();                                   \
-    })
-
 namespace BitTorrent {
 
-ErrorOr<NonnullRefPtr<Torrent>> Torrent::create(StringView input)
+ErrorOr<NonnullRefPtr<Torrent>> Torrent::parse(StringView input)
 {
     BencodeParser bencode_parser(input);
     auto content = TRY(bencode_parser.run());
@@ -65,6 +57,64 @@ ErrorOr<NonnullRefPtr<Torrent>> Torrent::create(StringView input)
     return adopt_nonnull_ref_or_enomem(new (nothrow) Torrent(announce_url, suggested_name, file_length, piece_length, pieces, info_hash, comment, created_by, creation_date));
 }
 
+template<typename Element>
+static DeprecatedString urlencode(Element const& element)
+{
+    StringBuilder builder;
+    for (u8 byte : element) {
+        auto is_intact = (byte >= '0' && byte <= '9') || (byte >= 'a' && byte <= 'z') || (byte >= 'A' && byte <= 'Z') || byte == '.' || byte == '-' || byte == '_' || byte == '~';
+
+        if (is_intact)
+            builder.append(static_cast<char>(byte));
+        else
+            builder.appendff("%{:02X}", byte);
+    }
+
+    return builder.to_deprecated_string();
+}
+
+ErrorOr<RefPtr<Protocol::Request>> Torrent::make_tracker_request(RefPtr<Protocol::RequestClient> request_client, DeprecatedString peer_id, u16 port, TrackerRequestEvent event) const
+{
+    DeprecatedString event_str;
+    switch (event) {
+    case TrackerRequestEvent::Started:
+        event_str = "started";
+        break;
+    case TrackerRequestEvent::Stopped:
+        event_str = "stopped";
+        break;
+    case TrackerRequestEvent::Completed:
+        event_str = "completed";
+        break;
+    }
+    HashMap<DeprecatedString, DeprecatedString> headers;
+    headers.set("User-Agent", "LibBitTorrent/1.0");
+
+    HashMap<DeprecatedString, DeprecatedString> params;
+    params.set("downloaded", DeprecatedString::number(m_bytes_downloaded));
+    params.set("uploaded", DeprecatedString::number(m_bytes_uploaded));
+    params.set("port", DeprecatedString::number(port));
+    params.set("left", DeprecatedString::number(bytes_left()));
+    params.set("compact", "1");
+    params.set("info_hash", urlencode(m_info_hash));
+    params.set("peer_id", urlencode(peer_id));
+    params.set("event", event_str);
+
+    StringBuilder query_builder;
+
+    for (auto const& entry : params) {
+        query_builder.append(entry.key);
+        query_builder.append("="sv);
+        query_builder.append(entry.value);
+        query_builder.append('&');
+    }
+    query_builder.trim(1);
+
+    URL target = m_announce_url;
+    target.set_query(TRY(query_builder.to_string()));
+    return request_client->start_request("GET", target, headers);
+}
+
 Torrent::Torrent(URL announce_url, DeprecatedString suggested_name, u64 file_length, u64 piece_length, Vector<Torrent::Hash> pieces, Torrent::Hash info_hash, Optional<DeprecatedString> comment, Optional<DeprecatedString> created_by, Optional<UnixDateTime> created_at)
     : m_announce_url(move(announce_url))
     , m_suggested_name(move(suggested_name))
@@ -77,5 +127,4 @@ Torrent::Torrent(URL announce_url, DeprecatedString suggested_name, u64 file_len
     , m_creation_date(move(created_at))
 {
 }
-
 }

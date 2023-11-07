@@ -10,6 +10,14 @@
 #include <AK/JsonValue.h>
 #include <AK/StringBuilder.h>
 
+#define REQUIRE(expr)                                                  \
+    ({                                                                 \
+        auto&& maybe_value = expr;                                     \
+        if (!maybe_value.has_value())                                  \
+            return Error::from_string_literal("Torrent: missing key"); \
+        maybe_value.release_value();                                   \
+    })
+
 namespace BitTorrent {
 
 DeprecatedString to_bencode(JsonValue const& value);
