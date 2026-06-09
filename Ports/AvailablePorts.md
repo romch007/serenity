@@ -376,3 +376,4 @@ This list is also available at [ports.serenityos.net](https://ports.serenityos.n
 | [`zlib`](zlib/)                                 | zlib                                                          | 1.3.1                     | https://www.zlib.net/                                                |
 | [`zsh`](zsh/)                                   | Z Shell (Zsh)                                                 | 5.9                       | https://www.zsh.org                                                  |
 | [`zstd`](zstd/)                                 | Zstandard                                                     | 1.5.7                     | https://facebook.github.io/zstd/                                     |
+| [`exiv2`](exiv2/)                               | exiv2                                                         | 0.28.8                    | https://exiv2.org/                                                   |
